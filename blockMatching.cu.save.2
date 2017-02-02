@@ -37,6 +37,9 @@ __host__ __device__ double computeMatch(unsigned char *im,
         }
   }
   x = x / nb;
+if(oi==0 && oj==1){
+    printf("dans le computewatch x = %d, y =  %d, result: %f\n",oi,oj,x);
+  }
 return x;
 }
 
@@ -50,17 +53,16 @@ __global__
 void myKernel(double *x, int im_step, int bl_step,  unsigned char *im, unsigned char *bl, int bl_cols, int bl_rows, int stride){
 
 
-    int idx =((blockIdx.x * blockDim.x) +threadIdx.x);
-    int idy =((blockIdx.y * blockDim.y) +threadIdx.y);
-
-
-
-x[((im_step*idy)+idx)] = computeMatch(im,im_step,
+    int idx =blockIdx.x * blockDim.x +threadIdx.x;
+    int idy =blockIdx.y * blockDim.y +threadIdx.y;
+x[im_step*idx+idy] = computeMatch(im,im_step,
                             bl,bl_step,bl_cols,bl_rows,
-                            idy,idx,stride);
+                            idx,idy,stride);
+if(idx==0 && idy==1){
+    printf("dans le kernel x = %d, y =  %d, result: %f\n",idx,idy,x[im_step*idx+idy] );
+  }
 
-
-
+//printf(" je suis dans le kernel idx= %d, idy=%d la valaur du tab: %d \n----------------------------------------------------------------------------",idx,idy,x[idy+im_step*idx]);
 
 }
 
@@ -148,10 +150,12 @@ if (!image || !blocki) return DBL_MAX;
 
 
 unsigned char *cim, *cbl;
+//double res[(im_rows*im_cols)];
 double *ctabX = NULL;
 
  
   cudaMalloc((void **)&cim, sizeof(unsigned char)*(im_rows*im_cols));
+//cudaMalloc((void **)&cbl, sizeof(unsigned char)*(bl_rows*bl_cols));
   cudaMalloc((void **)&ctabX,sizeof(double)*(im_rows*im_cols));
 
 
@@ -174,7 +178,7 @@ double *ctabX = NULL;
       int istart = 0;
       int iend =  im_rows - bl_rows;
       int jstart = 0;
-      int jend = im_cols - bl_cols;
+      int jend =  im_cols - bl_cols;
 
 //unsigned char *cim,*cbl ;
 double res[(im_rows*im_cols)];
@@ -207,10 +211,21 @@ double res[(im_rows*im_cols)];
   cudaMemcpy(bl,cbl, sizeof(unsigned char)*(bl_cols*bl_rows), cudaMemcpyDeviceToHost );
   cudaMemcpy(res,ctabX, sizeof(double)*(im_rows*im_cols), cudaMemcpyDeviceToHost ); 
 
+
 for(int i = istart;i < iend -stride+1;i+=stride){
     for(int j = jstart;j < jend-stride+1;j+=stride){
 
-if (res[j+im_step*i]<minVal){           
+//printf("pour i %d, j %d, element numero %d, valeur: %d  \n----------------------------------------------------------------------------",i,j,j+im_step*i,res[j+im_step*i]);
+
+//printf("pour i %d, j %d, element numero %d, valeur: %d, minValeur: %d  \n-------------------------",i,j,j+im_step*i,res[j+im_step*i],minVal);
+double x=res[j+im_step*i];
+	if(x  < minVal ){  
+
+//printf("pour i %d, j %d, element numero %d, valeur: %d, minValeur: %d  \n------------------------------------------------------",i,j,j+im_step*i,res[j+im_step*i],minVal);
+if(i==0 && j==1){
+    printf(" dans le if  x = %d, y =  %d, result: %f\n",i,j,res[j+im_step*i]);
+  }
+
 	  minVal = res[j+im_step*i];
 	    coord_i_min = i;
 	    coord_j_min = j;

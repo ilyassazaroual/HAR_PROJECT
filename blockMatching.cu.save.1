@@ -37,7 +37,8 @@ __host__ __device__ double computeMatch(unsigned char *im,
         }
   }
   x = x / nb;
-return x;
+  //  printf("%f\n",x);
+  return x;
 }
 
 
@@ -50,17 +51,12 @@ __global__
 void myKernel(double *x, int im_step, int bl_step,  unsigned char *im, unsigned char *bl, int bl_cols, int bl_rows, int stride){
 
 
-    int idx =((blockIdx.x * blockDim.x) +threadIdx.x);
-    int idy =((blockIdx.y * blockDim.y) +threadIdx.y);
-
-
-
-x[((im_step*idy)+idx)] = computeMatch(im,im_step,
+    int idx =blockIdx.x * blockDim.x +threadIdx.x;
+    int idy =blockIdx.y * blockDim.y +threadIdx.y;
+x[im_step*idx+idy] = computeMatch(im,im_step,
                             bl,bl_step,bl_cols,bl_rows,
-                            idy,idx,stride);
-
-
-
+                            idx,idy,stride);
+printf(" je suis dans le kernel idx= %d, idy=%d la valaur du tab: %d \n----------------------------------------------------------------------------",idx,idy,x[idy+im_step*idx]);
 
 }
 
@@ -147,11 +143,13 @@ if (!image || !blocki) return DBL_MAX;
   int bestRotation = 0;
 
 
-unsigned char *cim, *cbl;
-double *ctabX = NULL;
+unsigned char *cim,*cbl ;
+//double res[(im_rows*im_cols)];
+double *ctabX = NULL ;
 
  
   cudaMalloc((void **)&cim, sizeof(unsigned char)*(im_rows*im_cols));
+//cudaMalloc((void **)&cbl, sizeof(unsigned char)*(bl_rows*bl_cols));
   cudaMalloc((void **)&ctabX,sizeof(double)*(im_rows*im_cols));
 
 
@@ -162,7 +160,7 @@ double *ctabX = NULL;
     for (float s = 1.0; s > 0.3; s = s-0.1){
       
 
-      printf("Trying scaling %f min val : %d\n",s,minVal);
+      printf("Trying scaling %f\n",s);
       cv::Mat *block = scaleImage(rot,s);
       //showOneImage(*block);      
       
@@ -174,10 +172,10 @@ double *ctabX = NULL;
       int istart = 0;
       int iend =  im_rows - bl_rows;
       int jstart = 0;
-      int jend = im_cols - bl_cols;
+      int jend =  im_cols - bl_cols;
 
 //unsigned char *cim,*cbl ;
-double res[(im_rows*im_cols)];
+//double res[(im_rows*im_cols)];
 //double *ctabX = NULL ;
 
 
@@ -200,18 +198,20 @@ double res[(im_rows*im_cols)];
   cudaMemcpy(cbl,bl,sizeof(unsigned char)*(bl_rows*bl_cols), cudaMemcpyHostToDevice );
   cudaMemcpy(ctabX, res,sizeof(double)*(im_rows*im_cols), cudaMemcpyHostToDevice );
 
-  myKernel<<< blocks, threads >>>(ctabX, im_step, bl_step, cim, cbl, bl_cols,
- bl_rows, stride);
+  myKernel<<< blocks, threads >>>(ctabX, im_step, bl_step, cim, cbl, bl_cols, bl_rows, stride);
 
   cudaMemcpy(im,cim, sizeof(unsigned char)*(im_cols*im_rows), cudaMemcpyDeviceToHost );
   cudaMemcpy(bl,cbl, sizeof(unsigned char)*(bl_cols*bl_rows), cudaMemcpyDeviceToHost );
   cudaMemcpy(res,ctabX, sizeof(double)*(im_rows*im_cols), cudaMemcpyDeviceToHost ); 
 
+
 for(int i = istart;i < iend -stride+1;i+=stride){
     for(int j = jstart;j < jend-stride+1;j+=stride){
 
-if (res[j+im_step*i]<minVal){           
-	  minVal = res[j+im_step*i];
+//printf("pour i %d, j %d, element numero %d, valeur: %d  \n----------------------------------------------------------------------------",i,j,j+im_step*i,res[j+im_step*i]);
+
+printf("pour i %d, j %d, element numero %d, valeur: %d, minValeur: %d  \n----------------------------------------------------------------------------",i,j,j+im_step*i,res[j+im_step*i],minVal);
+	    minVal = res[j+im_step*i];
 	    coord_i_min = i;
 	    coord_j_min = j;
 	    bestScale = s;
