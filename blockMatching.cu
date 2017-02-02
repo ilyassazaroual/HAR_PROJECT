@@ -24,10 +24,13 @@ __host__ __device__ double computeMatch(unsigned char *im,
 
   if (!im || !bl) return 0.0;
 
-  double nb = (bl_cols*bl_rows);
+  double nb = bl_cols*bl_rows;
   double x = 0;
-  for(int i = 0;i < bl_rows-stride+1;i+= stride){
-  for(int j = 0;j < bl_cols-stride+1;j+= stride){
+  int maxI = bl_rows-stride+1;
+  int maxJ = bl_cols-stride+1;
+
+  for(int i = 0;i < maxI;i+= stride){
+  for(int j = 0;j < maxJ;j+= stride){
     unsigned char v1 = im[INDXs(im_step,oi+i,oj+j)];
     unsigned char v2 = bl[INDXs(bl_step,i,j)];
     x += (v2-v1)*(v2-v1);
@@ -50,12 +53,12 @@ __global__
 void myKernel(double *x, int im_step, int bl_step,  unsigned char *im, unsigned char *bl, int bl_cols, int bl_rows, int stride){
 
 
-    int idx =((blockIdx.x * blockDim.x) +threadIdx.x);
-    int idy =((blockIdx.y * blockDim.y) +threadIdx.y);
+    int idx =blockIdx.x * blockDim.x +threadIdx.x;
+    int idy =blockIdx.y * blockDim.y +threadIdx.y;
 
 
 
-x[((im_step*idy)+idx)] = computeMatch(im,im_step,
+x[im_step*idy+idx] = computeMatch(im,im_step,
                             bl,bl_step,bl_cols,bl_rows,
                             idy,idx,stride);
 
@@ -155,11 +158,12 @@ double *ctabX = NULL;
   cudaMalloc((void **)&ctabX,sizeof(double)*(im_rows*im_cols));
 
 
+
   
-  for (int r = -10; r < 10; r = r+2){
+  for (int r = -10; r < 10; r = r+8){
     printf("Trying rotation %d\n",r);
     cv::Mat *rot = rotateImage(blocki,r);
-    for (float s = 1.0; s > 0.3; s = s-0.1){
+    for (float s = 1.0; s > 0.; s = s-0.6){
       
 
       printf("Trying scaling %f min val : %d\n",s,minVal);
@@ -209,9 +213,9 @@ double res[(im_rows*im_cols)];
 
 for(int i = istart;i < iend -stride+1;i+=stride){
     for(int j = jstart;j < jend-stride+1;j+=stride){
-
-if (res[j+im_step*i]<minVal){           
-	  minVal = res[j+im_step*i];
+double tabActuel = res[j+im_step*i];
+if (tabActuel<minVal){           
+	  minVal = tabActuel;
 	    coord_i_min = i;
 	    coord_j_min = j;
 	    bestScale = s;
